@@ -1,0 +1,9 @@
+name = "roxom-sitemap"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[vars]
+BASE_URL = "https://roxom.com"
+ENTITIES_API_URL = "https://window.roxom.com"
+GHOST_SITEMAP_URL = "https://insights.roxom.com/sitemap-posts.xml"
+CACHE_TTL_SECONDS = "3600"
