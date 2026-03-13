@@ -73,7 +73,7 @@ export default {
 
         // Try KV first
         const kvKey = `sitemap:${path}`;
-        const cached = await env.SITEMAP_KV.get(kvKey);
+        const cached = await env.KV.get(kvKey);
         if (cached) {
             return xmlResponse(cached, cacheTtl);
         }
@@ -95,7 +95,7 @@ export default {
             const body =
                 result instanceof Promise ? await result : result;
             // Store in KV for next request
-            await env.SITEMAP_KV.put(kvKey, body, {
+            await env.KV.put(kvKey, body, {
                 expirationTtl: cacheTtl,
             });
             return xmlResponse(body, cacheTtl);
@@ -123,7 +123,7 @@ export default {
                 const result = generator(env);
                 const body =
                     result instanceof Promise ? await result : result;
-                await env.SITEMAP_KV.put(`sitemap:${path}`, body, {
+                await env.KV.put(`sitemap:${path}`, body, {
                     expirationTtl: cacheTtl,
                 });
                 console.log(`Sitemap cron: rebuilt ${path}`);

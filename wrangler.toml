@@ -11,8 +11,8 @@ CACHE_TTL_SECONDS = "3600"
 
 # KV namespace for pre-built sitemaps
 [[kv_namespaces]]
-binding = "SITEMAP_KV"
-id = "PLACEHOLDER_KV_ID"
+binding = "KV"
+id = "85b576fc172841f2b59d513139f946cf"
 
 # Cron trigger: rebuild sitemaps every hour
 [triggers]
