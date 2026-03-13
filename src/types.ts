@@ -20,8 +20,9 @@ export interface Entity {
 
 export interface Instrument {
     symbol: string;
-    type: string;
-    active: boolean;
+    instrumentType: string;
+    isActive: boolean;
+    isTradeable: boolean;
 }
 
 export interface SitemapEntry {

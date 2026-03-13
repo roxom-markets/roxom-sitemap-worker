@@ -28,20 +28,55 @@ async function fetchEntities(env: Env): Promise<Entity[]> {
     }
 
     try {
-        const response = await fetch(`${env.ENTITIES_API_URL}/entities`, {
-            headers: { "User-Agent": "RoxomSitemapWorker/1.0" },
-        });
+        const allEntities: Entity[] = [];
+        let page = 1;
+        const limit = 250;
+        let totalPages = 1;
 
-        if (!response.ok) {
-            console.error(`Failed to fetch entities: ${response.status}`);
-            return cachedEntities ?? [];
+        while (page <= totalPages) {
+            const response = await fetch(
+                `${env.ENTITIES_API_URL}/entities/paginated`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "User-Agent": "RoxomSitemapWorker/1.0",
+                    },
+                    body: JSON.stringify({
+                        page,
+                        limit,
+                        sortBy: "ticker",
+                        sortOrder: "asc",
+                    }),
+                },
+            );
+
+            if (!response.ok) {
+                console.error(
+                    `Failed to fetch entities page ${page}: ${response.status}`,
+                );
+                return cachedEntities ?? [];
+            }
+
+            const data = (await response.json()) as {
+                success: boolean;
+                data: {
+                    entities: Entity[];
+                    pagination: {
+                        page: number;
+                        limit: number;
+                        total: number;
+                        totalPages: number;
+                    };
+                };
+            };
+
+            allEntities.push(...data.data.entities);
+            totalPages = data.data.pagination.totalPages;
+            page++;
         }
 
-        const data = (await response.json()) as {
-            entities: Entity[];
-            count: number;
-        };
-        cachedEntities = data.entities.filter(isEntityLinkable);
+        cachedEntities = allEntities.filter(isEntityLinkable);
         cacheTimestamp = now;
 
         return cachedEntities;

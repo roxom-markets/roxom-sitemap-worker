@@ -25,9 +25,10 @@ async function fetchFuturesInstruments(env: Env): Promise<Instrument[]> {
         }
 
         const data = (await response.json()) as {
-            instruments: Instrument[];
+            items: Instrument[];
+            total: number;
         };
-        cachedInstruments = data.instruments.filter((i) => i.active);
+        cachedInstruments = data.items.filter((i) => i.isActive);
         cacheTimestamp = now;
 
         return cachedInstruments;
