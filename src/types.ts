@@ -3,6 +3,7 @@ export interface Env {
     ENTITIES_API_URL: string;
     GHOST_SITEMAP_URL: string;
     CACHE_TTL_SECONDS: string;
+    EXCHANGE_API_URL: string;
 }
 
 export interface Entity {
@@ -15,6 +16,12 @@ export interface Entity {
     active: boolean;
     isTradeable: boolean;
     lastUpdatedAt: string;
+}
+
+export interface Instrument {
+    symbol: string;
+    type: string;
+    active: boolean;
 }
 
 export interface SitemapEntry {

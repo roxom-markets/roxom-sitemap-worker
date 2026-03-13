@@ -9,6 +9,7 @@ import {
     generateChartsSitemap,
     generateNewsSitemap,
 } from "./generators/entities";
+import { generateExchangeSitemap } from "./generators/exchange";
 
 const ROUTES: Record<
     string,
@@ -21,6 +22,7 @@ const ROUTES: Record<
     "/sitemap-etfs.xml": (env) => generateEtfsSitemap(env),
     "/sitemap-charts.xml": (env) => generateChartsSitemap(env),
     "/sitemap-news.xml": (env) => generateNewsSitemap(env),
+    "/sitemap-exchange.xml": (env) => generateExchangeSitemap(env),
 };
 
 export default {

@@ -11,5 +11,6 @@ export function generateSitemapIndex(env: Env): string {
         `${base}/sitemap-etfs.xml`,
         `${base}/sitemap-charts.xml`,
         `${base}/sitemap-news.xml`,
+        `${base}/sitemap-exchange.xml`,
     ]);
 }
