@@ -8,3 +8,12 @@ ENTITIES_API_URL = "https://window.roxom.com"
 GHOST_SITEMAP_URL = "https://insights.roxom.com/sitemap-posts.xml"
 EXCHANGE_API_URL = "https://window.roxom.com"
 CACHE_TTL_SECONDS = "3600"
+
+# KV namespace for pre-built sitemaps
+[[kv_namespaces]]
+binding = "SITEMAP_KV"
+id = "PLACEHOLDER_KV_ID"
+
+# Cron trigger: rebuild sitemaps every hour
+[triggers]
+crons = ["0 * * * *"]

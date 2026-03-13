@@ -1,5 +1,5 @@
 import type { Env } from "./types";
-import { withCache, xmlResponse } from "./lib/cache";
+import { xmlResponse } from "./lib/cache";
 import { generateSitemapIndex } from "./generators/sitemap-index";
 import { generateStaticSitemap } from "./generators/static";
 import { generateBlogSitemap } from "./generators/blog";
@@ -11,10 +11,22 @@ import {
 } from "./generators/entities";
 import { generateExchangeSitemap } from "./generators/exchange";
 
-const ROUTES: Record<
-    string,
-    (env: Env) => string | Promise<string>
-> = {
+const SITEMAP_ROUTES: string[] = [
+    "/sitemap.xml",
+    "/sitemap-static.xml",
+    "/sitemap-blog.xml",
+    "/sitemap-stocks.xml",
+    "/sitemap-etfs.xml",
+    "/sitemap-charts.xml",
+    "/sitemap-news.xml",
+    "/sitemap-exchange.xml",
+];
+
+/**
+ * Generators for each sitemap — used by the cron trigger to pre-build.
+ * Blog, static, index, and exchange are lightweight and can also run inline.
+ */
+const GENERATORS: Record<string, (env: Env) => string | Promise<string>> = {
     "/sitemap.xml": (env) => generateSitemapIndex(env),
     "/sitemap-static.xml": (env) => generateStaticSitemap(env),
     "/sitemap-blog.xml": (env) => generateBlogSitemap(env),
@@ -25,22 +37,101 @@ const ROUTES: Record<
     "/sitemap-exchange.xml": (env) => generateExchangeSitemap(env),
 };
 
+/** Sitemaps that are too heavy to generate during a request (entities). */
+const HEAVY_SITEMAPS = new Set([
+    "/sitemap-stocks.xml",
+    "/sitemap-etfs.xml",
+    "/sitemap-charts.xml",
+    "/sitemap-news.xml",
+]);
+
+/** Lightweight sitemaps safe to generate inline if not in KV. */
+const LIGHT_GENERATORS: Record<
+    string,
+    (env: Env) => string | Promise<string>
+> = {
+    "/sitemap.xml": GENERATORS["/sitemap.xml"],
+    "/sitemap-static.xml": GENERATORS["/sitemap-static.xml"],
+    "/sitemap-blog.xml": GENERATORS["/sitemap-blog.xml"],
+    "/sitemap-exchange.xml": GENERATORS["/sitemap-exchange.xml"],
+};
+
 export default {
+    /**
+     * HTTP request handler — serves sitemaps from KV, falling back to
+     * inline generation for lightweight sitemaps only.
+     */
     async fetch(request: Request, env: Env): Promise<Response> {
         const url = new URL(request.url);
         const path = url.pathname;
 
-        const generator = ROUTES[path];
-        if (!generator) {
-            // Pass through to origin for unmatched routes
+        if (!SITEMAP_ROUTES.includes(path)) {
             return fetch(request);
         }
 
         const cacheTtl = parseInt(env.CACHE_TTL_SECONDS, 10) || 3600;
 
-        return withCache(request, cacheTtl, async () => {
+        // Try KV first
+        const kvKey = `sitemap:${path}`;
+        const cached = await env.SITEMAP_KV.get(kvKey);
+        if (cached) {
+            return xmlResponse(cached, cacheTtl);
+        }
+
+        // For heavy sitemaps with no KV data, return a minimal placeholder
+        // (cron hasn't run yet). This avoids 1101 errors.
+        if (HEAVY_SITEMAPS.has(path)) {
+            const placeholder =
+                '<?xml version="1.0" encoding="UTF-8"?>' +
+                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+                "</urlset>";
+            return xmlResponse(placeholder, 60);
+        }
+
+        // Lightweight sitemaps can be generated inline
+        const generator = LIGHT_GENERATORS[path];
+        if (generator) {
             const result = generator(env);
-            return result instanceof Promise ? await result : result;
-        });
+            const body =
+                result instanceof Promise ? await result : result;
+            // Store in KV for next request
+            await env.SITEMAP_KV.put(kvKey, body, {
+                expirationTtl: cacheTtl,
+            });
+            return xmlResponse(body, cacheTtl);
+        }
+
+        return fetch(request);
+    },
+
+    /**
+     * Cron trigger — rebuilds ALL sitemaps and stores in KV.
+     * Scheduled invocations have 30s+ CPU time, enough for entity fetches.
+     */
+    async scheduled(
+        _event: ScheduledEvent,
+        env: Env,
+        ctx: ExecutionContext,
+    ): Promise<void> {
+        const cacheTtl = parseInt(env.CACHE_TTL_SECONDS, 10) || 3600;
+
+        console.log("Sitemap cron: starting rebuild");
+
+        for (const path of SITEMAP_ROUTES) {
+            try {
+                const generator = GENERATORS[path];
+                const result = generator(env);
+                const body =
+                    result instanceof Promise ? await result : result;
+                await env.SITEMAP_KV.put(`sitemap:${path}`, body, {
+                    expirationTtl: cacheTtl,
+                });
+                console.log(`Sitemap cron: rebuilt ${path}`);
+            } catch (error) {
+                console.error(`Sitemap cron: failed ${path}:`, error);
+            }
+        }
+
+        console.log("Sitemap cron: rebuild complete");
     },
 };
