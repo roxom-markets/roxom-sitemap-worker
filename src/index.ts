@@ -65,6 +65,38 @@ export default {
         const url = new URL(request.url);
         const path = url.pathname;
 
+        // Manual rebuild trigger: GET /_rebuild?key=<REBUILD_KEY>
+        if (path === "/_rebuild") {
+            const key = url.searchParams.get("key");
+            if (!env.REBUILD_KEY || key !== env.REBUILD_KEY) {
+                return new Response("Unauthorized", { status: 401 });
+            }
+
+            const cacheTtl = parseInt(env.CACHE_TTL_SECONDS, 10) || 3600;
+            const results: string[] = [];
+
+            for (const sitemapPath of SITEMAP_ROUTES) {
+                try {
+                    const generator = GENERATORS[sitemapPath];
+                    const result = generator(env);
+                    const body =
+                        result instanceof Promise ? await result : result;
+                    await env.KV.put(`sitemap:${sitemapPath}`, body, {
+                        expirationTtl: cacheTtl,
+                    });
+                    results.push(`OK ${sitemapPath} (${body.length} bytes)`);
+                } catch (error) {
+                    results.push(
+                        `FAIL ${sitemapPath}: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                }
+            }
+
+            return new Response(results.join("\n"), {
+                headers: { "Content-Type": "text/plain" },
+            });
+        }
+
         if (!SITEMAP_ROUTES.includes(path)) {
             return fetch(request);
         }
@@ -113,25 +145,37 @@ export default {
         env: Env,
         ctx: ExecutionContext,
     ): Promise<void> {
-        const cacheTtl = parseInt(env.CACHE_TTL_SECONDS, 10) || 3600;
+        ctx.waitUntil(
+            (async () => {
+                const cacheTtl =
+                    parseInt(env.CACHE_TTL_SECONDS, 10) || 3600;
 
-        console.log("Sitemap cron: starting rebuild");
+                console.log("Sitemap cron: starting rebuild");
 
-        for (const path of SITEMAP_ROUTES) {
-            try {
-                const generator = GENERATORS[path];
-                const result = generator(env);
-                const body =
-                    result instanceof Promise ? await result : result;
-                await env.KV.put(`sitemap:${path}`, body, {
-                    expirationTtl: cacheTtl,
-                });
-                console.log(`Sitemap cron: rebuilt ${path}`);
-            } catch (error) {
-                console.error(`Sitemap cron: failed ${path}:`, error);
-            }
-        }
+                for (const path of SITEMAP_ROUTES) {
+                    try {
+                        const generator = GENERATORS[path];
+                        const result = generator(env);
+                        const body =
+                            result instanceof Promise
+                                ? await result
+                                : result;
+                        await env.KV.put(`sitemap:${path}`, body, {
+                            expirationTtl: cacheTtl,
+                        });
+                        console.log(
+                            `Sitemap cron: rebuilt ${path} (${body.length} bytes)`,
+                        );
+                    } catch (error) {
+                        console.error(
+                            `Sitemap cron: failed ${path}:`,
+                            error,
+                        );
+                    }
+                }
 
-        console.log("Sitemap cron: rebuild complete");
+                console.log("Sitemap cron: rebuild complete");
+            })(),
+        );
     },
 };

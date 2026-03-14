@@ -120,9 +120,7 @@ export async function generateStocksSitemap(env: Env): Promise<string> {
 
     const entries: SitemapEntry[] = stocks.map((entity) => ({
         url: `${env.BASE_URL}/terminal/stock/${encodeTickerForUrl(entity.ticker)}`,
-        lastmod: entity.lastUpdatedAt
-            ? new Date(entity.lastUpdatedAt).toISOString()
-            : undefined,
+        lastmod: safeISODate(entity.lastUpdatedAt),
         changefreq: "daily",
         priority: 0.7,
     }));
@@ -136,9 +134,7 @@ export async function generateEtfsSitemap(env: Env): Promise<string> {
 
     const entries: SitemapEntry[] = etfs.map((entity) => ({
         url: `${env.BASE_URL}/terminal/etf/${encodeTickerForUrl(entity.ticker)}`,
-        lastmod: entity.lastUpdatedAt
-            ? new Date(entity.lastUpdatedAt).toISOString()
-            : undefined,
+        lastmod: safeISODate(entity.lastUpdatedAt),
         changefreq: "daily",
         priority: 0.7,
     }));
@@ -151,9 +147,7 @@ export async function generateChartsSitemap(env: Env): Promise<string> {
 
     const entries: SitemapEntry[] = entities.map((entity) => ({
         url: `${env.BASE_URL}/terminal/charts/${encodeTickerForUrl(entity.ticker)}`,
-        lastmod: entity.lastUpdatedAt
-            ? new Date(entity.lastUpdatedAt).toISOString()
-            : undefined,
+        lastmod: safeISODate(entity.lastUpdatedAt),
         changefreq: "daily",
         priority: 0.5,
     }));
@@ -166,14 +160,18 @@ export async function generateNewsSitemap(env: Env): Promise<string> {
 
     const entries: SitemapEntry[] = entities.map((entity) => ({
         url: `${env.BASE_URL}/terminal/news/${encodeTickerForUrl(entity.ticker)}`,
-        lastmod: entity.lastUpdatedAt
-            ? new Date(entity.lastUpdatedAt).toISOString()
-            : undefined,
+        lastmod: safeISODate(entity.lastUpdatedAt),
         changefreq: "daily",
         priority: 0.4,
     }));
 
     return buildSitemap(entries);
+}
+
+function safeISODate(dateStr: string): string | undefined {
+    if (!dateStr) return undefined;
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? undefined : d.toISOString();
 }
 
 function encodeTickerForUrl(ticker: string): string {

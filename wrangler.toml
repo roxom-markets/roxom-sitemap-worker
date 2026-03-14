@@ -1,4 +1,5 @@
 name = "roxom-sitemap"
+account_id = "939be7f3eaad96fe02047a7744702446"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 
@@ -7,7 +8,8 @@ BASE_URL = "https://roxom.com"
 ENTITIES_API_URL = "https://window.roxom.com"
 GHOST_SITEMAP_URL = "https://insights.roxom.com/sitemap-posts.xml"
 EXCHANGE_API_URL = "https://window.roxom.com"
-CACHE_TTL_SECONDS = "3600"
+CACHE_TTL_SECONDS = "7200"
+REBUILD_KEY = "roxom-sitemap-rebuild-2024"
 
 # KV namespace for pre-built sitemaps
 [[kv_namespaces]]

@@ -4,6 +4,7 @@ export interface Env {
     GHOST_SITEMAP_URL: string;
     CACHE_TTL_SECONDS: string;
     EXCHANGE_API_URL: string;
+    REBUILD_KEY: string;
     KV: KVNamespace;
 }
 
