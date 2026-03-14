@@ -71,46 +71,47 @@ async function fetchEntityPage(
 }
 
 let cachedEntities: Entity[] | null = null;
-let cacheTimestamp = 0;
-const ENTITY_CACHE_MS = 60 * 60 * 1000; // 1 hour in-memory cache
 
 async function fetchEntities(env: Env): Promise<Entity[]> {
-    const now = Date.now();
-    if (cachedEntities && now - cacheTimestamp < ENTITY_CACHE_MS) {
+    if (cachedEntities) {
         return cachedEntities;
     }
 
     try {
         const limit = 4000;
+        const expectedTotal: number[] = [];
 
         // First request to discover total pages
         const firstPage = await fetchEntityPage(env, 1, limit);
-        if (!firstPage) return cachedEntities ?? [];
+        if (!firstPage) return [];
 
-        const allEntities: Entity[] = [...firstPage.entities];
+        const entityMap = new Map<string, Entity>();
+        for (const e of firstPage.entities) {
+            entityMap.set(e.id, e);
+        }
         const totalPages = firstPage.totalPages;
 
-        // Fetch remaining pages in parallel
-        if (totalPages > 1) {
-            const pageNumbers = Array.from(
-                { length: totalPages - 1 },
-                (_, i) => i + 2,
-            );
-            const results = await Promise.all(
-                pageNumbers.map((p) => fetchEntityPage(env, p, limit)),
-            );
-            for (const result of results) {
-                if (result) allEntities.push(...result.entities);
+        // Fetch remaining pages sequentially to avoid pagination instability
+        for (let page = 2; page <= totalPages; page++) {
+            const result = await fetchEntityPage(env, page, limit);
+            if (result) {
+                for (const e of result.entities) {
+                    entityMap.set(e.id, e);
+                }
             }
         }
 
+        const allEntities = Array.from(entityMap.values());
         cachedEntities = allEntities.filter(isEntityLinkable);
-        cacheTimestamp = now;
+
+        console.log(
+            `Entities: ${allEntities.length} total, ${cachedEntities.length} linkable (${totalPages} pages)`,
+        );
 
         return cachedEntities;
     } catch (error) {
         console.error("Failed to fetch entities:", error);
-        return cachedEntities ?? [];
+        return [];
     }
 }
 

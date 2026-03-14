@@ -69,6 +69,7 @@ function putKV(key: string, value: string): void {
 
 // ─── Entity fetching ────────────────────────────────────────────────
 interface Entity {
+    id: string;
     ticker: string;
     entitySubType?: string;
     entityClass?: string;
@@ -87,27 +88,35 @@ async function fetchEntities(): Promise<Entity[]> {
     });
     if (!firstResp.ok) throw new Error(`Entities API page 1: ${firstResp.status}`);
     const firstData = (await firstResp.json()) as any;
-    const all: Entity[] = [...firstData.data.entities];
     const totalPages: number = firstData.data.pagination.totalPages;
-    console.log(`  Got ${all.length} entities, ${totalPages} total pages`);
 
-    if (totalPages > 1) {
-        const pages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
-        const results = await Promise.all(
-            pages.map(async (p) => {
-                console.log(`Fetching entities page ${p}...`);
-                const resp = await fetch(`${ENTITIES_API_URL}/entities/paginated`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", "User-Agent": "RoxomSitemapPopulate/1.0" },
-                    body: JSON.stringify({ page: p, limit, sortBy: "ticker", sortOrder: "asc" }),
-                });
-                if (!resp.ok) return [];
-                const data = (await resp.json()) as any;
-                return data.data.entities as Entity[];
-            }),
-        );
-        for (const r of results) all.push(...r);
+    // Deduplicate by entity ID to handle unstable API pagination
+    const entityMap = new Map<string, Entity>();
+    for (const e of firstData.data.entities) {
+        entityMap.set(e.id, e);
     }
+    console.log(`  Got ${firstData.data.entities.length} entities, ${totalPages} total pages`);
+
+    // Fetch remaining pages sequentially to avoid pagination instability
+    for (let page = 2; page <= totalPages; page++) {
+        console.log(`Fetching entities page ${page}...`);
+        const resp = await fetch(`${ENTITIES_API_URL}/entities/paginated`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "User-Agent": "RoxomSitemapPopulate/1.0" },
+            body: JSON.stringify({ page, limit, sortBy: "ticker", sortOrder: "asc" }),
+        });
+        if (!resp.ok) {
+            console.error(`  Page ${page} failed: ${resp.status}`);
+            continue;
+        }
+        const data = (await resp.json()) as any;
+        for (const e of data.data.entities) {
+            entityMap.set(e.id, e);
+        }
+    }
+
+    const all = Array.from(entityMap.values());
+    console.log(`  Total unique entities: ${all.length}`);
 
     return all.filter(
         (e) => LINKABLE_TYPES.has(e.entitySubType ?? "") || LINKABLE_TYPES.has(e.entityClass ?? ""),
