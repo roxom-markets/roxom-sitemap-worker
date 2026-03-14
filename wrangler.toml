@@ -1,4 +1,4 @@
-name = "roxom-sitemap"
+name = "roxom-sitemap-worker"
 account_id = "939be7f3eaad96fe02047a7744702446"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
